@@ -1,5 +1,21 @@
 #processing functions
 
+#packages, could be tidied? 
+
+library(patchwork)
+library(dplyr)
+library(rmweather)
+library(ranger)
+library(ggplot2)
+library(worldmet)
+library(openair)
+library(tidyr)
+library(foreach)
+library(purrr)
+require(RcppRoll)
+library(zoo)
+library(plotly)
+library(rpatrec)
 
 #-------------------------------- Creates dataset that combines AQ and met data -----------------------
 

@@ -3,7 +3,7 @@ library(patchwork)
 
 #example case 1
 
-solar_response_df = read.delim("~/R_coding_example/solar_elevation_angle.txt") %>%
+solar_response_df = read.delim("~/live_change_point_development/solar_elevation_angle.txt") %>%
   rename(value = "X.3.841817855834960938e.00") %>%
   mutate(index = row_number())
 
