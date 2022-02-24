@@ -8,11 +8,13 @@ solar_response_df = read.delim("~/live_change_point_development/solar_elevation_
   mutate(index = row_number())
 
 solar_roll_regres = rollRegres::roll_regres(value ~ index, solar_response_df, width = 40,
-                                         do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
+                                do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
 
 solar_regres_coeff = as.data.frame(solar_roll_regres$coefs) %>%
   rename(grad = index) %>%
   mutate(index = solar_response_df$index)
+
+plot(solar_regres_coeff$grad, type = "l")
 
 
 solar_2nd_derivative = as.data.frame(pracma::gradient(solar_regres_coeff$grad)) %>%
@@ -28,18 +30,21 @@ max(solar_2nd_derivative$rollmax)
 
 solar_response_plot = solar_response_df %>%
   ggplot(aes(index, value)) +
-  geom_line(lwd = 1.5, colour = "green") +
-  ggtitle("Solar df example")
+  geom_line(lwd = 1.5, colour = "red")+
+  labs(x= "Scan line", y = "f(x)") +
+  ggtitle("Test dataset")
 
 solar_1st_derivative_plot = solar_regres_coeff %>%
   ggplot(aes(index, grad)) +
-  geom_line(lwd = 1.5, colour = "red") +
-  ggtitle("1st derivative example")
+  geom_line(lwd = 1.5, colour = "green")+
+  labs(x= "Scan line", y = "f'(x)") +
+  ggtitle("Rolling linear regression - window length = 40")
 
 solar_2nd_derivative_plot = solar_2nd_derivative %>%
   ggplot(aes(index, rollmax)) +
-  geom_line(lwd = 1, colour = "blue", alpha = 0.6) +
-  ggtitle("2nd derivative example")
+  geom_line(lwd = 1.5, colour = "blue")+
+  labs(x= "Scan line", y = "f''(x)") +
+  ggtitle("2nd derivative")
 
 plotly::ggplotly(solar_2nd_derivative_plot)
 

@@ -362,3 +362,50 @@ change_point_detection = function(df, begin_date, end_date, variable, ncpts, dat
   
   return(cp_df)
 }
+
+
+#-------------creates statistical output to constrain window length with SD --------------
+
+window_length_constrain_stats = function(df, window_length_vector, percentage_length_vector,
+                                   standard_deviation){
+  
+  noise_df = df %>%
+    mutate(noise = value + standard_deviation*runif(nrow(df)))
+  
+  noise_roll_regression = rollRegres::roll_regres(noise ~ index, noise_df, 
+                                                  width = window_length_vector,
+                                                  do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
+  
+  noise_roll_reformat = as.data.frame(noise_roll_regression$coefs) %>%
+    rename("Rolling gradient" = index) %>%
+    mutate("Correlation coeffient" = noise_roll_regression$r.squareds,
+           "Standard error" = noise_roll_regression$sigmas,
+           index = df$index,
+           window_length_level = as.factor(window_length_vector),
+           percentage_level = as.factor(percentage_length_vector)) %>%
+    select(-"(Intercept)") %>%
+    drop_na() %>%
+    pivot_longer(-c(index, window_length_level, percentage_level), names_to = "variables") 
+  
+  return(noise_roll_reformat)
+}
+
+#-----------function to apply sD vector, therefore adding noise to dataset-----------
+
+apply_white_noise = function(df, standard_deviation_vector){
+  if(standard_deviation_vector == 0){
+    
+    noise_df = df %>%
+      mutate(noise = value,
+             standard_deviation = as.factor(standard_deviation_vector))
+  }
+  
+  else{
+    noise_df = df %>%
+      mutate(noise = value + standard_deviation_vector*runif(nrow(df)),
+             standard_deviation = as.factor(standard_deviation_vector))
+  }
+  
+  
+  return(noise_df)
+}
