@@ -88,10 +88,10 @@ n_labels = solar_white_noise_sd_0 %>%
          .keep = "unused")
 
 plt1 = solar_white_noise_sd_0 %>%
-  filter(variables == "Test dataset", percentage_level == "1.25%") %>%
+  filter(variables == "Test dataset") %>%
   ggplot(aes(x = index, y = value))+
   geom_line(colour = "red", lwd = 1.2)+
-  geom_point(data = ~filter(.x, variables == "Test dataset" & cp==TRUE & percentage_level == "1.25%")
+  geom_point(data = ~filter(.x, variables == "Test dataset" & cp==TRUE)
              , colour = "blue", size = 5)+
   geom_label(data = ~filter(n_labels, percentage_level == "1.25%"), 
              aes(x = x, y = y, label = n_cp), color = "black", size = 13)+

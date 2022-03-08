@@ -247,7 +247,8 @@ df_cp_detection = function(df, window_width, rollmax_width, date = TRUE){
       rename(change_point = "pracma::gradient(df_regres_coeff$grad)") %>%
       mutate(date = df_regres_coeff$date, change_point = abs(change_point),
              rollmax = zoo::rollmax(change_point, k = rollmax_width, align = "right", fill = NA),
-             flag = rollmax-lag(rollmax) > 0 &  sign(rollmax) == sign(lead(rollmax, rollmax_width-1))) 
+             flag = rollmax-lag(rollmax) > 0 &  sign(rollmax) == sign(lead(rollmax, rollmax_width-1)) &
+               rollmax > 0) 
   }
   else{
     df_roll_regres = rollRegres::roll_regres(value ~ index, df, width = window_width,
@@ -263,7 +264,7 @@ df_cp_detection = function(df, window_width, rollmax_width, date = TRUE){
       mutate(index = df_regres_coeff$index, change_point = round(abs(change_point), 7),
              rollmax = zoo::rollmax(change_point, k = rollmax_width, align = "right", fill = NA),
              flag = rollmax-lag(rollmax) > 0 &  rollmax == lead(rollmax, rollmax_width-1) &
-               rollmax > 1e-5)
+               rollmax > 0)
     
   }
   
