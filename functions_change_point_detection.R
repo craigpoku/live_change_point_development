@@ -128,6 +128,12 @@ rmweather_BAU_observed = function(df, site, n_tree, begin_date_train, end_date_t
                                     n_trees = n_tree,
                                     verbose = TRUE)
       
+      rm_df_normal = rmw_do_all(df_prepared_predict,
+                                variables = variables_atmos,
+                                n_trees = n_tree,
+                                n_samples = n_tree,
+                                verbose = TRUE)
+      
       rm_df_train_test = rmw_predict_the_test_set(
         rm_df_train, 
         df = df_prepared_train
@@ -141,10 +147,12 @@ rmweather_BAU_observed = function(df, site, n_tree, begin_date_train, end_date_t
       
       rm_df_predict = df_prepared_predict %>% mutate(value_predict = rmw_predict(
         rm_df_train, 
-        df = df_prepared_predict), training_rsquared = rm_df_train$r.squared, 
+        df = df_prepared_predict),
+        rm_normal_value = rm_df_normal$normalised$value_predict,
+        training_rsquared = rm_df_train$r.squared, 
         training_mse = rm_df_train$prediction.error,
         testing_rsquared = testing_rsquared, testing_mse = testing_mse) %>%
-        select(date, value, value_predict, training_rsquared, training_mse, testing_rsquared,
+        select(date, value, rm_normal_value, value_predict, training_rsquared, training_mse, testing_rsquared,
                testing_mse)
       
     } else {
@@ -155,6 +163,12 @@ rmweather_BAU_observed = function(df, site, n_tree, begin_date_train, end_date_t
                                     n_trees = n_tree,
                                     verbose = TRUE)
       
+      rm_df_normal = rmw_do_all(df_prepared_predict,
+                                variables = variables_no_atmos,
+                                n_trees = n_tree,
+                                n_samples = n_tree,
+                                verbose = TRUE)
+      
       rm_df_train_test = rmw_predict_the_test_set(
         rm_df_train, 
         df = df_prepared_train
@@ -168,10 +182,12 @@ rmweather_BAU_observed = function(df, site, n_tree, begin_date_train, end_date_t
       
       rm_df_predict = df_prepared_predict %>% mutate(value_predict = rmw_predict(
         rm_df_train, 
-        df = df_prepared_predict), training_rsquared = rm_df_train$r.squared, 
+        df = df_prepared_predict),
+        rm_normal_value = rm_df_normal$normalised$value_predict,
+        training_rsquared = rm_df_train$r.squared, 
         training_mse = rm_df_train$prediction.error,
         testing_rsquared = testing_rsquared, testing_mse = testing_mse) %>%
-        select(date, value, value_predict, training_rsquared, training_mse, testing_rsquared,
+        select(date, value, rm_normal_value, value_predict, training_rsquared, training_mse, testing_rsquared,
                testing_mse)
       
       
