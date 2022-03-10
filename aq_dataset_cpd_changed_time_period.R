@@ -29,17 +29,26 @@ London_code_no2_urban_background = unique(as.character(met_aq_london_urban_backg
 
 #Note, ULEZ was initially implemented 8th April 2019, ran code a month prior to implementation
 
-BAU_urban_background_no2_london = map(.x = London_code_no2_urban_background,
-                                       .f = ~rmweather_BAU_observed(df = met_aq_london_urban_background_no2,
+BAU_urban_background_no2_london_2 = map(.x = London_code_no2_urban_background,
+                                       .f = ~rmweather_BAU_observed_no_normal(df = met_aq_london_urban_background_no2,
                                                           site = .x, 300, "2016-01-01", 
-                                                          "2019-03-15", "2020-07-31",
-                                                          0.85, 300))
+                                                          "2019-01-15", "2020-07-31",
+                                                          0.85))
 
-london_urban_background_no2_reformat = urban_reformat_data_mean_sd(BAU_urban_background_no2_london,
+london_urban_background_no2_reformat_2 = urban_reformat_data_mean_sd_no_normal(BAU_urban_background_no2_london_2,
                                        London_code_no2_urban_background)
 
+london_urban_background_no2_wd_ws_2 = urban_reformat_data_delta_wd_ws(BAU_urban_background_no2_london_2,
+                                                                    met_aq_london_urban_background_no2,
+                                                                   London_code_no2_urban_background) 
 
-london_urban_statistics = urban_model_statistics(BAU_urban_background_no2_london,
+london_urban_background_no2_BAU_observed_2 = urban_reformat_data_BAU_output(BAU_urban_background_no2_london_2,
+                                                                   London_code_no2_urban_background)
+
+london_urban_background_no2_observed_2 = urban_reformat_observed(BAU_urban_background_no2_london_2,
+                                                                   London_code_no2_urban_background)
+
+london_urban_statistics_2 = urban_model_statistics(BAU_urban_background_no2_london_2,
                                                  London_code_no2_urban_background)
 
 
@@ -110,11 +119,56 @@ test_plot = delta_comparison_london_no2 %>%
              linetype = "dashed")+
   theme_bw(base_size = 20)
 
-test_plot
-stats_plot
 
-ggplotly(test_plot)
+london_urban_background_no2_BAU_observed %>%
+  filter(date >= as.Date("2019-01-01") & date <= as.Date("2019-07-31")) %>% 
+  ggplot(aes(x = date, y = value))+ 
+  geom_line(aes(colour = variables), lwd = 1.5)+
+  labs(x= "Date", y = "Various Units", colour = "Variables")+ 
+  geom_vline(xintercept = as.POSIXct(as.Date("2019-03-15")), 
+             color = "black", 
+             lwd = 1,
+             linetype = "dashed")+
+  theme_bw(base_size = 20)+ 
+  ggtitle("Training stops 15th March")
 
+london_urban_background_no2_BAU_observed_2 %>%
+  filter(date >= as.Date("2019-01-01") & date <= as.Date("2019-07-31")) %>% 
+  ggplot(aes(x = date, y = value))+ 
+  geom_line(aes(colour = variables), lwd = 1.5)+
+  labs(x= "Date", y = "Various Units", colour = "Variables")+ 
+  geom_vline(xintercept = as.POSIXct(as.Date("2019-01-15")), 
+             color = "black", 
+             lwd = 1,
+             linetype = "dashed")+
+  theme_bw(base_size = 20)+ 
+  ggtitle("Training stops 15th Jan")
+
+
+london_urban_background_no2_wd_ws %>%
+  filter(date >= as.Date("2019-01-01") & date <= as.Date("2019-06-30")) %>% 
+  ggplot(aes(x = date, y = value))+ 
+  geom_line(aes(colour = variables), lwd = 1.5) +
+  facet_grid(variables~., scales = "free_y")+
+  labs(x= "Date", y = "Various Units", colour = "Variables")+ 
+  geom_vline(xintercept = as.POSIXct(as.Date("2019-03-15")), 
+             color = "black", 
+             lwd = 1,
+             linetype = "dashed")+
+  theme_bw(base_size = 20)
+
+london_urban_background_no2_observed %>%
+  filter(date >= as.Date("2019-01-01") & date <= as.Date("2019-06-30")) %>% 
+  ggplot(aes(x = date, y = d7_rollavg_mean)) + 
+  geom_ribbon(aes(y = d7_rollavg_mean, 
+                  ymin = d7_rollavg_mean - d7_rollavg_sd, 
+                  ymax = d7_rollavg_mean + d7_rollavg_sd), alpha = .3) +
+  geom_line(colour = "red", lwd = 1.5)+ 
+  geom_vline(xintercept = as.POSIXct(as.Date("2019-03-15")), 
+             color = "black", 
+             lwd = 1,
+             linetype = "dashed") +
+  labs(x= "Date", y = "Observed") 
 
 
 
