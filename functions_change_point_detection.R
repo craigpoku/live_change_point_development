@@ -201,9 +201,282 @@ rmweather_BAU_observed = function(df, site, n_tree, begin_date_train, end_date_t
   }
 }
 
+#---------------------------Creates df that contains observed vs BAU data using rmweather--------------
+#also contains relevant statistics e.g. MSE, rsquared coefficient for linear regression
+# note, there is no normalisation data in this function
+
+rmweather_BAU_observed_no_normal = function(df, site, n_tree, begin_date_train, end_date_train, 
+                                  end_date_predict, data_threshold){
+  
+  print(paste(site, "rm process beginning"))
+  
+  begin_year = as.numeric(substring(begin_date_train,1,4))
+  end_year = as.numeric(substring(end_date_train,1,4))
+  
+  begin_month = as.numeric(substring(begin_date_train,6,7))
+  end_month = as.numeric(substring(end_date_train,6,7))
+  
+  begin_day = as.numeric(substring(begin_date_train,9,10))
+  end_day = as.numeric(substring(end_date_train,9,10))  
+  
+  diff_hours = c(ISOdate(end_year,end_month,end_day), ISOdate(begin_year,begin_month,begin_day))
+  
+  diff_hours_quality_check = difftime(diff_hours[1], diff_hours[2], units="hours")+1
+  
+  df_quality_check = df %>% 
+    filter(date >= as.Date(begin_date_train), code == site)
+  
+  total_date_df = length(df_quality_check$date)
+  print(length(df_quality_check$date)/as.numeric(diff_hours_quality_check))
+  
+  if(length(df_quality_check$date)/as.numeric(diff_hours_quality_check) >= data_threshold){
+    
+    df_prepared_train = df_quality_check %>% 
+      filter(date <= as.Date(end_date_train))%>%
+      rmw_prepare_data(na.rm = TRUE)
+    
+    
+    df_prepared_predict = df_quality_check %>% 
+      filter(date <= as.Date(end_date_predict)) %>%
+      rmw_prepare_data(na.rm = TRUE)
+    
+    
+    variables_atmos = c("ws","wd","air_temp",
+                        "RH", "atmospheric_pressure", "date_unix", "day_julian", "weekday", "hour")
+    
+    variables_no_atmos = c("ws","wd","air_temp",
+                           "RH", "date_unix", "day_julian", "weekday", "hour")
+    
+    
+    if(sum(df_prepared_predict$atmospheric_pressure, na.rm=T)>0){
+      
+      print(paste(site, "df contains atmospheric pressure variable"))
+      rm_df_train = rmw_train_model(df_prepared_train,
+                                    variables = variables_atmos,
+                                    n_trees = n_tree,
+                                    verbose = TRUE)
+      
+      
+      rm_df_train_test = rmw_predict_the_test_set(
+        rm_df_train, 
+        df = df_prepared_train
+      )
+      
+      testing_mse = as.numeric(sum((rm_df_train_test$value-rm_df_train_test$value_predict)^2)/
+                                 count(rm_df_train_test))
+      testing_rsquared = cor(rm_df_train_test$value, 
+                             rm_df_train_test$value_predict)^2
+      
+      
+      rm_df_predict = df_prepared_predict %>% mutate(value_predict = rmw_predict(
+        rm_df_train, 
+        df = df_prepared_predict),
+        training_rsquared = rm_df_train$r.squared, 
+        training_mse = rm_df_train$prediction.error,
+        testing_rsquared = testing_rsquared, testing_mse = testing_mse) %>%
+        select(date, value, value_predict, training_rsquared, training_mse, testing_rsquared,
+               testing_mse)
+      
+    } else {
+      
+      print(paste(site, "df does not contains atmospheric pressure variable"))
+      rm_df_train = rmw_train_model(df_prepared_train,
+                                    variables = variables_no_atmos,
+                                    n_trees = n_tree,
+                                    verbose = TRUE)
+      
+      rm_df_train_test = rmw_predict_the_test_set(
+        rm_df_train, 
+        df = df_prepared_train
+      )
+      
+      testing_mse = as.numeric(sum((rm_df_train_test$value-rm_df_train_test$value_predict)^2)/
+                                 count(rm_df_train_test))
+      testing_rsquared = cor(rm_df_train_test$value, 
+                             rm_df_train_test$value_predict)^2
+      
+      
+      rm_df_predict = df_prepared_predict %>% mutate(value_predict = rmw_predict(
+        rm_df_train, 
+        df = df_prepared_predict),
+        training_rsquared = rm_df_train$r.squared, 
+        training_mse = rm_df_train$prediction.error,
+        testing_rsquared = testing_rsquared, testing_mse = testing_mse) %>%
+        select(date, value, value_predict, training_rsquared, training_mse, testing_rsquared,
+               testing_mse)
+      
+      
+      
+      print(paste(site, "rm process complete"))
+      print("---------------------------------------------------------------------")
+      return(rm_df_predict)
+    }}
+  else{print(paste(site, "skipped due to insufficient data"))
+    print("---------------------------------------------------------------------")
+  }
+}
+
 
 #---------------reformats output from BAU vs Observed to make more user friendly ------
 urban_reformat_data_mean_sd = function(df, UK_code){
+  names(df) = UK_code
+  
+  predict_df = plyr::ldply(df, 
+                           data.frame) %>%
+    filter(!is.na(date)) %>%
+    rename(sites = .id, BAU = value_predict, observed = value)%>%
+    select(sites, date, BAU, rm_normal_value, observed)
+  
+  predict_df_mean = predict_df %>%
+    timeAverage(avg.time = "1 day", statistic = c("mean"))%>%
+    rename(BAU_mean = BAU, observed_mean = observed, rm_normal_mean = rm_normal_value) %>%
+    mutate(delta_BAU_predict_mean = observed_mean- BAU_mean)
+  
+  predict_df_sd = predict_df %>%
+    timeAverage(avg.time = "1 day", statistic = c("sd")) %>%
+    rename(BAU_sd = BAU, observed_sd = observed, rm_normal_sd = rm_normal_value) %>%
+    mutate(delta_BAU_predict_sd = abs(observed_sd-BAU_sd))
+  
+  predict_df_frequency = predict_df %>%
+    select(-c(BAU, rm_normal_value)) %>%
+    timeAverage(avg.time = "1 day", statistic = c("frequency"))%>%
+    rename(observed_frequency = observed)
+  
+  predict_df_combo = left_join(predict_df_mean, predict_df_sd, by = "date") %>% 
+    left_join(., predict_df_frequency, by = "date")
+  
+  predict_df_combo = predict_df_combo %>%
+    mutate(CI_lower = observed_mean - 1.96*(observed_sd/sqrt(observed_frequency)),
+           CI_upper = observed_mean + 1.96*(observed_sd/sqrt(observed_frequency))) %>%
+    select(-observed_frequency) %>%
+    mutate(d7_rollavg_delta_BAU_predict_mean = roll_mean(delta_BAU_predict_mean, n = 7, align = "right", 
+                                                         fill = NA),
+           d7_rollavg_delta_BAU_predict_sd = roll_mean(delta_BAU_predict_sd, n = 7, align = "right", 
+                                                       fill = NA),
+           d7_rollavg_observed_mean = roll_mean(observed_mean, n = 7, align = "right", 
+                                                fill = NA),
+           d7_rollavg_BAU_mean = roll_mean(BAU_mean, n = 7, align = "right", 
+                                           fill = NA),
+           d7_rollavg_CI_lower = roll_mean(CI_lower, n = 7, align = "right", 
+                                           fill = NA),
+           d7_rollavg_CI_upper = roll_mean(CI_upper, n = 7, align = "right", 
+                                           fill = NA),
+           d7_rollavg_rm_normal_mean = roll_mean(rm_normal_mean, n = 7, align = "right", 
+                                                 fill = NA))
+  
+  return(predict_df_combo)
+  
+}
+
+#---------returns delta alongside meteorological variables --------------
+
+urban_reformat_data_delta_wd_ws = function(df, df2, UK_code){
+  names(df) = UK_code
+  
+  predict_df = plyr::ldply(df, 
+                           data.frame) %>%
+    filter(!is.na(date)) %>%
+    rename(sites = .id, BAU = value_predict, observed = value)%>%
+    mutate(delta = observed - BAU)%>%
+    select(sites, date, delta, observed, BAU)
+  
+  wd_ws = df2 %>%
+    select(date, code, ws, wd, air_temp, RH) %>%
+    rename(sites = code)
+  
+  
+  predict_df_combo = merge(predict_df, wd_ws, by = c("date", "sites")) %>%
+    mutate() %>%
+    timeAverage(avg.time = "1 day", statistic = c("mean")) %>%
+    mutate(Delta = zoo::rollapply(delta,7,mean,align='right',fill=NA),
+           BAU = zoo::rollapply(BAU,7,mean,align='right',fill=NA),
+           observed = zoo::rollapply(observed,7,mean,align='right',fill=NA),
+           WS = zoo::rollapply(ws,7,mean,align='right',fill=NA),
+           WD = zoo::rollapply(wd,7,mean,align='right',fill=NA),
+           Temp = zoo::rollapply(air_temp,7,mean,align='right',fill=NA),
+           RelHum = zoo::rollapply(RH,7,mean,align='right',fill=NA)) %>%
+    drop_na()%>%
+    select(-c(delta, wd, ws, air_temp, RH))%>%
+     pivot_longer(-date, names_to = "variables")%>%
+     mutate(variables = factor(variables, 
+                               levels = c("Delta", "BAU", "observed", "WS", "WD", "Temp", "RelHum")))
+     
+  
+  
+  
+  return(predict_df_combo)
+  
+  
+}
+
+#---------returns delta alongside meteorological variables --------------
+
+urban_reformat_data_BAU_output = function(df, UK_code){
+  names(df) = UK_code
+  
+  predict_df = plyr::ldply(df, 
+                           data.frame) %>%
+    filter(!is.na(date)) %>%
+    rename(sites = .id, BAU = value_predict, observed = value)%>%
+    mutate(delta = observed - BAU)%>%
+    select(sites, date, BAU, observed, delta)%>%
+    timeAverage(avg.time = "1 day", statistic = c("mean")) %>%
+    mutate(delta = zoo::rollapply(delta,7,mean,align='right',fill=NA),
+           BAU = zoo::rollapply(BAU,7,mean,align='right',fill=NA),
+           observed = zoo::rollapply(observed,7,mean,align='right',fill=NA)) %>%
+    drop_na %>%
+    pivot_longer(-date, names_to = "variables")
+  
+  
+  return(predict_df)
+  
+  
+}
+
+
+#------just observed----------------
+urban_reformat_observed = function(df, UK_code){
+  names(df) = UK_code
+  
+  predict_df = plyr::ldply(df, 
+                           data.frame) %>%
+    filter(!is.na(date)) %>%
+    rename(sites = .id, BAU = value_predict, observed = value)%>%
+    select(sites, date, observed)
+  
+  predict_df_mean = predict_df %>%
+    timeAverage(avg.time = "1 day", statistic = c("median"))%>%
+    rename(observed_mean = observed)
+  
+  predict_df_max = predict_df %>%
+    timeAverage(avg.time = "1 day", statistic = c("max"))%>%
+    rename(observed_max = observed)
+  
+  predict_df_min = predict_df %>%
+    timeAverage(avg.time = "1 day", statistic = c("min"))%>%
+    rename(observed_min = observed)
+  
+  predict_df_sd = predict_df %>%
+    timeAverage(avg.time = "1 day", statistic = c("sd"))%>%
+    rename(observed_sd = observed)
+
+  predict_df_combo = left_join(predict_df_mean, predict_df_max, by = "date") %>% 
+    left_join(., predict_df_min, by = "date") %>%
+    left_join(., predict_df_sd, by = "date")
+  
+  predict_df_combo = predict_df_combo %>%
+    mutate(d7_rollavg_mean = zoo::rollapply(observed_mean,7,mean,align='right',fill=NA),
+           d7_rollavg_max = zoo::rollapply(observed_max,7,mean,align='right',fill=NA),
+           d7_rollavg_min = zoo::rollapply(observed_min,7,mean,align='right',fill=NA),
+           d7_rollavg_sd = zoo::rollapply(observed_sd,7,mean,align='right',fill=NA))
+  
+  return(predict_df_combo)
+  
+}
+
+#---------------reformats output from BAU vs Observed to make more user friendly ------
+#note doesn't include normalisation term
+urban_reformat_data_mean_sd_no_normal = function(df, UK_code){
   names(df) = UK_code
   
   predict_df = plyr::ldply(df, 
