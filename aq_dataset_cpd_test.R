@@ -6,6 +6,7 @@ require(RcppRoll)
 library(ggplot2)
 library(plotly)
 library(tidyr)
+library(purrr)
 #Processing code----------------------------------------------
 
 london_kcl_meta = importMeta(source = "kcl") %>%

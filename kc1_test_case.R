@@ -41,8 +41,8 @@ kc1_df_train = rmw_train_model(kc1_prepared_train,
 
 kc1_df_normal = rmw_do_all(df = kc1_prepared_predict,
   variables = kc1_variables_atmos,
-  n_trees = 300,
-  n_samples = 300)
+  n_trees = 50,
+  n_samples = 50)
 
 
 kc1_df_normal_time_series = kc1_df_normal$normalised %>%

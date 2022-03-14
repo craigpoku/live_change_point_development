@@ -10,11 +10,11 @@ solar_response_df = read.delim("~/live_change_point_development/solar_elevation_
 solar_roll_regres = rollRegres::roll_regres(value ~ index, solar_response_df, width = 40,
                                 do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
 
-solar_regres_coeff = as.data.frame(solar_roll_regres$coefs) %>%
-  rename(grad = index) %>%
+solar_regres_coeff = as.data.frame(solar_roll_regres$r.squareds) %>%
+  rename( r.squareds="solar_roll_regres$r.squareds") %>%
   mutate(index = solar_response_df$index)
 
-plot(solar_regres_coeff$grad, type = "l")
+plot(solar_regres_coeff$r.squareds, type = "l")
 
 
 solar_2nd_derivative = as.data.frame(pracma::gradient(solar_regres_coeff$grad)) %>%
