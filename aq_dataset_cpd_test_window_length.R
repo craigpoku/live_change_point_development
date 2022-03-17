@@ -8,7 +8,7 @@ print(dim(rmweather_no2_df))
 
 plot(rmweather_no2_df, type = "l")
 
-window_length_rm = c(7, 8, 9, 10, 11, 12) #4, 6, 8, 12, 25%, 50% respectively
+window_length_rm = c(6, 7, 8, 9, 10, 11) #4, 6, 8, 12, 25%, 50% respectively
 percentage_value_rm = c("4%", "6%", "8%", "12%", "25%", "25%")
 
 window_length_constrain = function(df, window_length_vector, percentage_length_vector){
@@ -44,11 +44,11 @@ aq_test_window_length = map2_dfr(.x = window_length_rm, .y = percentage_value_rm
                                   .f = ~window_length_constrain(df = rmweather_no2_df,
                                                                           .x, .y))
 aq_test_window_length%>%
-  filter(date >= as.Date("2019-03-01") & date <= as.Date("2019-06-30"),
-         window_length_level == 8, variables == "Test dataset") %>%
+  filter(date >= as.Date("2019-04-01") & date <= as.Date("2019-06-15"),
+        window_length_level == 8, variables == "Test dataset") %>%
   ggplot(aes(x = date, y = value))+
   annotate("rect", xmin = as.POSIXct(as.Date("2019-04-08")), 
-           xmax = as.POSIXct(as.Date("2019-06-30")), ymin = -Inf, ymax = Inf, 
+           xmax = as.POSIXct(as.Date("2019-06-15")), ymin = -Inf, ymax = Inf, 
            alpha = .2)+
   geom_line(colour = "red", lwd = 1.5)+
   geom_point(data = ~filter(.x, variables == "Test dataset" & cp==TRUE)
@@ -58,5 +58,8 @@ aq_test_window_length%>%
              fill = "white",
              size = 10) +
   theme_bw(base_size = 20)
+
+#,
+#window_length_level == 8
 
   
