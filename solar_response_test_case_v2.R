@@ -14,6 +14,7 @@ solar_regres_coeff = as.data.frame(solar_roll_regres$r.squareds) %>%
   rename( r.squareds="solar_roll_regres$r.squareds") %>%
   mutate(index = solar_response_df$index)
 
+plot(solar_response_df$index, solar_response_df$value, type = "l")
 plot(solar_regres_coeff$r.squareds, type = "l")
 
 

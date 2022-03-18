@@ -8,7 +8,7 @@ print(dim(rmweather_no2_df))
 
 plot(rmweather_no2_df, type = "l")
 
-window_length_rm = c(6, 7, 8, 9, 10, 11) #4, 6, 8, 12, 25%, 50% respectively
+window_length_rm = c(7, 14,21, 28, 35, 42) #4, 6, 8, 12, 25%, 50% respectively
 percentage_value_rm = c("4%", "6%", "8%", "12%", "25%", "25%")
 
 window_length_constrain = function(df, window_length_vector, percentage_length_vector){
@@ -20,45 +20,54 @@ window_length_constrain = function(df, window_length_vector, percentage_length_v
   roll_reformat_cp = as.data.frame(roll_regression$coefs) %>%
     rename(grad = date) %>%
     mutate(date = df$date,
+           r.squareds = roll_regression$r.squareds,
            data = df$value,
+           grad = round(grad, 7),
            window_length_level = as.factor(window_length_vector),
            percentage_level = as.factor(percentage_length_vector),
            derv_2nd = pracma::gradient(grad),
-           rollmax = rollmax(derv_2nd, k = 4, align = "right", fill = NA),
-           cp = rollmax-lag(rollmax) > 0 & rollmax == lead(rollmax, 2)
+           rollmax = rollmax(derv_2nd, k = 2, align = "right", fill = NA),
+           cp = rollmax-lag(rollmax) > 0 & rollmax == lead(rollmax, 1)
     ) %>%rename("Test dataset" = data,
                 "Rolling gradient" = grad,
                 "2nd derivative" = derv_2nd,
                 "Applied rollmax" = rollmax)%>%
     select(-"(Intercept)") %>%
     drop_na() %>%
-    pivot_longer(-c(date, window_length_level, percentage_level, cp), names_to = "variables")%>%
+    pivot_longer(-c(date, window_length_level, percentage_level, cp), 
+                 names_to = "variables")%>%
     mutate(variables = factor(variables, 
                               levels = c("Test dataset", "Rolling gradient", "2nd derivative",
-                                         "Applied rollmax")))
+                                         "Applied rollmax", "r.squareds")))
   
   return(roll_reformat_cp)
 }
 
+write.csv(rmweather_no2_df, "rmweather_no2_df")
+
+
 aq_test_window_length = map2_dfr(.x = window_length_rm, .y = percentage_value_rm,
                                   .f = ~window_length_constrain(df = rmweather_no2_df,
                                                                           .x, .y))
+w = 21
+
 aq_test_window_length%>%
-  filter(date >= as.Date("2019-04-01") & date <= as.Date("2019-06-15"),
-        window_length_level == 8, variables == "Test dataset") %>%
+  filter(date >= as.Date("2019-03-01") & date <= as.Date("2019-06-30"),
+         window_length_level == w, variables != "r.squareds") %>%
   ggplot(aes(x = date, y = value))+
   annotate("rect", xmin = as.POSIXct(as.Date("2019-04-08")), 
            xmax = as.POSIXct(as.Date("2019-06-15")), ymin = -Inf, ymax = Inf, 
            alpha = .2)+
-  geom_line(colour = "red", lwd = 1.5)+
-  geom_point(data = ~filter(.x, variables == "Test dataset" & cp==TRUE)
-             , colour = "blue", size = 4)+
-  labs(x= "Date", y = bquote('Normalised'~NO[2]~(mu * g*~m^"-3")))+
-  geom_label(aes(x = as.POSIXct(as.Date("2019-05-07")), y = 30, label = "ULEZ implementation"), 
-             fill = "white",
-             size = 10) +
-  theme_bw(base_size = 20)
+  geom_line(aes(colour = variables), lwd = 1.5)+
+  geom_point(data = filter(aq_test_window_length, date >= as.Date("2019-03-01") & date <= as.Date("2019-06-30"),
+                           cp==TRUE & variables == "Test dataset"
+                           & window_length_level == w)
+             , size  = 3, colour = "blue")+
+  labs(x= "Date", y = bquote('Normalised'~NO[2]~(mu * g*~m^"-3"))) +
+  facet_grid(vars(variables), vars(window_length_level), scales = "free_y") +
+  theme_bw(base_size = 15)
 
+#
 #,
 #window_length_level == 8
 
