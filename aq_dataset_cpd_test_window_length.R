@@ -1,5 +1,5 @@
 rmweather_no2_df = delta_comparison_london_no2 %>%
-  filter(date >= as.Date("2019-01-01") & date <= as.Date("2019-06-30"),
+  filter(date >= as.Date("2019-01-01") & date <= as.Date("2019-07-31"),
          delta == "rmweather") %>%
   select(-delta)
 
@@ -25,8 +25,8 @@ window_length_constrain = function(df, window_length_vector, percentage_length_v
            grad = round(grad, 7),
            window_length_level = as.factor(window_length_vector),
            percentage_level = as.factor(percentage_length_vector),
-           derv_2nd = pracma::gradient(grad),
-           rollmax = rollmax(derv_2nd, k = 2, align = "right", fill = NA),
+           derv_2nd = abs(pracma::gradient(grad)),
+           rollmax = rollmax(derv_2nd, k = 1, align = "right", fill = NA),
            cp = rollmax-lag(rollmax) > 0 & rollmax == lead(rollmax, 1)
     ) %>%rename("Test dataset" = data,
                 "Rolling gradient" = grad,
@@ -49,17 +49,17 @@ write.csv(rmweather_no2_df, "rmweather_no2_df")
 aq_test_window_length = map2_dfr(.x = window_length_rm, .y = percentage_value_rm,
                                   .f = ~window_length_constrain(df = rmweather_no2_df,
                                                                           .x, .y))
-w = 21
+w = 14
 
 aq_test_window_length%>%
-  filter(date >= as.Date("2019-03-01") & date <= as.Date("2019-06-30"),
+  filter(date >= as.Date("2019-03-01") & date <= as.Date("2019-07-30"),
          window_length_level == w, variables != "r.squareds") %>%
   ggplot(aes(x = date, y = value))+
   annotate("rect", xmin = as.POSIXct(as.Date("2019-04-08")), 
            xmax = as.POSIXct(as.Date("2019-06-15")), ymin = -Inf, ymax = Inf, 
            alpha = .2)+
   geom_line(aes(colour = variables), lwd = 1.5)+
-  geom_point(data = filter(aq_test_window_length, date >= as.Date("2019-03-01") & date <= as.Date("2019-06-30"),
+  geom_point(data = filter(aq_test_window_length, date >= as.Date("2019-03-01") & date <= as.Date("2019-07-30"),
                            cp==TRUE & variables == "Test dataset"
                            & window_length_level == w)
              , size  = 3, colour = "blue")+
