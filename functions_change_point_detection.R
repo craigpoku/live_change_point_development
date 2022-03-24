@@ -656,28 +656,33 @@ change_point_detection = function(df, begin_date, end_date, variable, ncpts, dat
 
 #-------------creates statistical output to constrain window length with SD --------------
 
-window_length_constrain_stats = function(df, window_length_vector, percentage_length_vector,
-                                   standard_deviation){
+window_length_constrain = function(df, window_length_vector, k){
   
-  noise_df = df %>%
-    mutate(noise = value + standard_deviation*runif(nrow(df)))
+  roll_regression = rollRegres::roll_regres(value ~ date, df, 
+                                            width = window_length_vector,
+                                            do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
   
-  noise_roll_regression = rollRegres::roll_regres(noise ~ index, noise_df, 
-                                                  width = window_length_vector,
-                                                  do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
-  
-  noise_roll_reformat = as.data.frame(noise_roll_regression$coefs) %>%
-    rename("Rolling gradient" = index) %>%
-    mutate("Correlation coeffient" = noise_roll_regression$r.squareds,
-           "Standard error" = noise_roll_regression$sigmas,
-           index = df$index,
+  roll_reformat_cp = as.data.frame(roll_regression$coefs) %>%
+    rename(grad = date) %>%
+    mutate(date = df$date,
+           r.squareds = roll_regression$r.squareds,
+           data = df$value,
+           grad = round(grad, k),
            window_length_level = as.factor(window_length_vector),
-           percentage_level = as.factor(percentage_length_vector)) %>%
+           derv_2nd = as.numeric(abs(pracma::gradient(grad))),
+           cp = derv_2nd-lag(derv_2nd) > 0 & derv_2nd == lead(derv_2nd, 1)
+    ) %>%rename("Test dataset" = data,
+                "Rolling gradient" = grad,
+                "2nd derivative" = derv_2nd)%>%
     select(-"(Intercept)") %>%
     drop_na() %>%
-    pivot_longer(-c(index, window_length_level, percentage_level), names_to = "variables") 
+    pivot_longer(-c(date, window_length_level, cp), 
+                 names_to = "variables")%>%
+    mutate(variables = factor(variables, 
+                              levels = c("Test dataset", "Rolling gradient", "2nd derivative", 
+                                         "r.squareds")))
   
-  return(noise_roll_reformat)
+  return(roll_reformat_cp)
 }
 
 #-----------function to apply sD vector, therefore adding noise to dataset-----------
@@ -698,4 +703,46 @@ apply_white_noise = function(df, standard_deviation_vector){
   
   
   return(noise_df)
+}
+
+#--------- function to test what is a suitable choice in window length --------
+
+change_point_model_statistics = function(df, window_length, stats = TRUE){
+  df_reformat = df %>%
+    filter(variables == "Test dataset", window_length_level == window_length) %>%
+    mutate(date = lubridate::as_date(date))
+  
+  cp_df  = df_reformat %>%
+    filter(cp == TRUE)
+  
+  ApproxFun = approxfun(x = cp_df$date, y = cp_df$value)
+  Dates_seq <- seq.Date(ymd(df$date[1]), ymd(tail(df$date, n=1)), by = 1)
+  LinearFit = ApproxFun(Dates_seq)
+  
+  df_approx = data.frame(Dates_seq, LinearFit)%>%
+    rename(date = Dates_seq, approx_value = LinearFit)
+  
+  df_new = df %>%
+    filter(window_length_level == window_length, variables == "Test dataset") 
+  
+  if(stats == TRUE){
+    
+    df_combo_temp = left_join(df_new, df_approx, by = "date") %>%
+      drop_na() %>%
+      select(date, value, approx_value)
+    
+    rmse = Metrics::rmse(df_combo_temp$value, df_combo_temp$approx_value)
+    rsquared = cor(df_combo_temp$value, df_combo_temp$approx_value, method ="pearson")
+    df_combo = data.frame(window_length, rmse, rsquared)
+  }
+  else{
+    df_combo = left_join(df_new, df_approx, by = "date")%>%
+      mutate(cp = df_reformat$cp)  %>%
+      select(date, window_length_level, cp, value, approx_value)  %>%
+      drop_na() %>%
+      rename("f(x)" = value, "Approxed f(x)" = approx_value) %>%
+      pivot_longer(-c(date, window_length_level, cp), names_to = "variables")
+  }
+  
+  return(df_combo)
 }
