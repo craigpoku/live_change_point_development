@@ -6,7 +6,8 @@ library(rpatrec)
 
 solar_response_df = read.delim("~/R_coding_example/solar_elevation_angle.txt") %>%
   rename(value = "X.3.841817855834960938e.00") %>%
-  mutate(index = row_number())
+  mutate(index = row_number()) %>%
+  relocate(value, .after = index)
 
 window_length = c(35, 140, 280, 700) #1.25, 5, 10, 25% respectively
 percentage_values = c("1.25%", "5%", "10%", "25%")

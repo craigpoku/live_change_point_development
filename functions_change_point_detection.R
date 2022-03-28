@@ -16,6 +16,8 @@ require(RcppRoll)
 library(zoo)
 library(plotly)
 library(rpatrec)
+library(lubridate)
+library(Metrics)
 
 #-------------------------------- Creates dataset that combines AQ and met data -----------------------
 
