@@ -658,31 +658,34 @@ change_point_detection = function(df, begin_date, end_date, variable, ncpts, dat
 
 #-------------creates statistical output to constrain window length with SD --------------
 
-window_length_constrain = function(df, window_length_vector, k){
+window_length_constrain = function(df, window_length_vector, k, rollmax_width){
   
-  roll_regression = rollRegres::roll_regres(value ~ date, df, 
+  roll_regression = rollRegres::roll_regres(value ~ index, df, 
                                             width = window_length_vector,
                                             do_compute = c("sigmas", "r.squareds", "1_step_forecasts"))  
   
+  
   roll_reformat_cp = as.data.frame(roll_regression$coefs) %>%
-    rename(grad = date) %>%
-    mutate(date = df$date,
+    rename(grad = index) %>%
+    mutate(index = df$index,
            r.squareds = roll_regression$r.squareds,
            data = df$value,
            grad = round(grad, k),
            window_length_level = as.factor(window_length_vector),
            derv_2nd = as.numeric(abs(pracma::gradient(grad))),
-           cp = derv_2nd-lag(derv_2nd) > 0 & derv_2nd == lead(derv_2nd, 1)
+           rollmax = zoo::rollmax(derv_2nd, k = rollmax_width, align = "right", fill = NA),
+           cp = rollmax-lag(rollmax) > 0 & rollmax == lead(rollmax, 4)
     ) %>%rename("Test dataset" = data,
                 "Rolling gradient" = grad,
-                "2nd derivative" = derv_2nd)%>%
+                "2nd derivative" = derv_2nd,
+                "Rollmax" = rollmax)%>%
     select(-"(Intercept)") %>%
     drop_na() %>%
-    pivot_longer(-c(date, window_length_level, cp), 
+    pivot_longer(-c(index, window_length_level, cp), 
                  names_to = "variables")%>%
     mutate(variables = factor(variables, 
                               levels = c("Test dataset", "Rolling gradient", "2nd derivative", 
-                                         "r.squareds")))
+                                         "Rollmax", "r.squareds")))
   
   return(roll_reformat_cp)
 }
@@ -748,3 +751,5 @@ change_point_model_statistics = function(df, window_length, stats = TRUE){
   
   return(df_combo)
 }
+
+
