@@ -476,6 +476,111 @@ urban_reformat_observed = function(df, UK_code){
   
 }
 
+#---------------reformats output from normalised data to make more user friendly ------
+urban_reformat_data_mean_sd_no_normal = function(df, UK_code, ULEZ_code,
+                                                 normal=TRUE, ULEZ = TRUE){
+  names(df) = UK_code
+  
+  if(normal==TRUE){
+    if(ULEZ==TRUE){
+      predict_df = plyr::ldply(df, 
+                               data.frame) %>%
+        filter(!is.na(date)) %>%
+        rename(sites = .id, normal_value = value_predict, observed = raw_value)%>%
+        select(sites, date, normal_value, observed)%>%
+        filter(sites %in% ULEZ_code) 
+    }
+    else{
+      predict_df = plyr::ldply(df, 
+                               data.frame) %>%
+        filter(!is.na(date)) %>%
+        rename(sites = .id, normal_value = value_predict, observed = raw_value)%>%
+        select(sites, date, normal_value, observed) 
+    }
+
+    
+    predict_df_mean = predict_df %>%
+      timeAverage(avg.time = "1 day", statistic = c("mean"))%>%
+      rename(normal_mean = normal_value, observed_mean = observed)
+    
+    predict_df_sd = predict_df %>%
+      timeAverage(avg.time = "1 day", statistic = c("sd")) %>%
+      rename(normal_sd = normal_value, observed_sd = observed)
+    
+    predict_df_frequency = predict_df %>%
+      select(-normal_value) %>%
+      timeAverage(avg.time = "1 day", statistic = c("frequency"))%>%
+      rename(observed_frequency = observed)
+    
+    predict_df_combo = left_join(predict_df_mean, predict_df_sd, by = "date") %>% 
+      left_join(., predict_df_frequency, by = "date")
+    
+    predict_df_combo = predict_df_combo %>%
+      mutate(CI_lower = observed_mean - 1.96*(observed_sd/sqrt(observed_frequency)),
+             CI_upper = observed_mean + 1.96*(observed_sd/sqrt(observed_frequency))) %>%
+      select(-observed_frequency) %>%
+      mutate(d7_rollavg_normal_mean = zoo::rollapply(normal_mean,7,mean,align='right',fill=NA),
+             d7_rollavg_normal_sd = zoo::rollapply(normal_sd,7,mean,align='right',fill=NA),
+             d7_rollavg_observed_mean = zoo::rollapply(observed_mean,7,mean,align='right',fill=NA),
+             d7_rollavg_observed_sd = zoo::rollapply(observed_sd,7,mean,align='right',fill=NA),
+             d7_rollavg_CI_lower = zoo::rollapply(CI_lower,7,mean,align='right',fill=NA),
+             d7_rollavg_CI_upper = zoo::rollapply(CI_upper,7,mean,align='right',fill=NA))
+    
+    return(predict_df_combo)
+  }
+  else{
+    if(ULEZ==TRUE){
+      predict_df = plyr::ldply(df, 
+                               data.frame) %>%
+        filter(!is.na(date)) %>%
+        rename(sites = .id, BAU = value_predict, observed = value)%>%
+        select(sites, date, BAU, observed)%>%
+        filter(sites %in% ULEZ_code) 
+    }
+    else{
+      predict_df = plyr::ldply(df, 
+                               data.frame) %>%
+        filter(!is.na(date)) %>%
+        rename(sites = .id, BAU = value_predict, observed = value)%>%
+        select(sites, date, BAU, observed)  
+    }
+    predict_df_mean = predict_df %>%
+      timeAverage(avg.time = "1 day", statistic = c("mean"))%>%
+      rename(BAU_mean = BAU, observed_mean = observed) %>%
+      mutate(delta_BAU_predict_mean = observed_mean- BAU_mean)
+    
+    predict_df_sd = predict_df %>%
+      timeAverage(avg.time = "1 day", statistic = c("sd")) %>%
+      rename(BAU_sd = BAU, observed_sd = observed) %>%
+      mutate(delta_BAU_predict_sd = abs(observed_sd-BAU_sd))
+    
+    predict_df_frequency = predict_df %>%
+      select(-BAU) %>%
+      timeAverage(avg.time = "1 day", statistic = c("frequency"))%>%
+      rename(observed_frequency = observed)
+    
+    predict_df_combo = left_join(predict_df_mean, predict_df_sd, by = "date") %>% 
+      left_join(., predict_df_frequency, by = "date")
+    
+    predict_df_combo = predict_df_combo %>%
+      mutate(CI_lower = observed_mean - 1.96*(observed_sd/sqrt(observed_frequency)),
+             CI_upper = observed_mean + 1.96*(observed_sd/sqrt(observed_frequency))) %>%
+      select(-observed_frequency) %>%
+      mutate(d7_rollavg_delta_BAU_predict_mean = zoo::rollapply(delta_BAU_predict_mean,7,mean,align='right',fill=NA),
+             d7_rollavg_delta_BAU_predict_sd = zoo::rollapply(delta_BAU_predict_sd,7,mean,align='right',fill=NA),
+             d7_rollavg_observed_mean = zoo::rollapply(observed_mean,7,mean,align='right',fill=NA),
+             d7_rollavg_BAU_mean = zoo::rollapply(BAU_mean,7,mean,align='right',fill=NA),
+             d7_rollavg_CI_lower = zoo::rollapply(CI_lower,7,mean,align='right',fill=NA),
+             d7_rollavg_CI_upper = zoo::rollapply(CI_upper,7,mean,align='right',fill=NA))
+    
+    return(predict_df_combo)
+  }
+  
+  
+  
+}
+
+
 #---------------reformats output from BAU vs Observed to make more user friendly ------
 #note doesn't include normalisation term
 urban_reformat_data_mean_sd_no_normal = function(df, UK_code){
