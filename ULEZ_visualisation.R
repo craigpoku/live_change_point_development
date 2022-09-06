@@ -60,6 +60,8 @@ ULEZ_example_detected_cps = map2_dfr(.x = 7, .y = ULEZ_total_cp_code,
                                                            .x, .y, cp_factor = 2,
                                                            epsilon = 1e-9, date = TRUE))
 
+ULEZ_example_coinciding_CPs = coinciding_cp_generator(ULEZ_example_detected_cps)
+
 ULEZ_example_detected_cps %>%
   filter(date >= as.Date("2019-03-01") & date <= as.Date("2019-06-30"), 
          variables == "Input dataset") %>% 
@@ -68,10 +70,14 @@ ULEZ_example_detected_cps %>%
   annotate("rect", xmin = as.POSIXct("2019-04-08"), 
            xmax = as.POSIXct("2019-06-30"), ymin = -Inf, ymax = Inf, 
            alpha = .2)+
-  geom_point(data = filter(ULEZ_example_detected_cps,
-                           cp==TRUE & date >= as.POSIXct("2019-03-15") & variables %in% c("Input dataset"))
-             , size  = 3, colour = "blue")+
-  labs(x= "Date", y = "Rolling 7 day Various Units", colour = "Human impact comparison")+
+  geom_vline(data = filter(ULEZ_example_detected_cps,
+                           cp==TRUE & date >= as.POSIXct("2019-03-15") & variables %in% c("Input dataset")),
+             aes(xintercept = date), colour = "blue")+
+  geom_vline(data = filter(ULEZ_example_detected_cps,
+                           cp==TRUE & date >= as.POSIXct("2019-03-15") & variables %in% c("Input dataset")
+                           & date %in% ULEZ_example_coinciding_CPs),
+             aes(xintercept = date), colour = "red")+
+  labs(x= "Date", colour = "Human impact comparison")+ylab(quickText("Normalised pollutants (ug/m3)"))+
   facet_grid(df_label~., scales = "free_y")+
   ggtitle("Applied CPD example - ULEZ AQ vs compliance")
 
